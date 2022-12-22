@@ -12,6 +12,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <stdint.h>
 /*********************************************************************************************************/
 
 
@@ -23,7 +24,7 @@ static int commands_counter = 0;
 label_temp labels_array[MAX_LINES];
 int words_array[MAX_LINES]; /* Stores all the '.word' commands */
 
-static const char *opcode[] = {"add", "sub", "mul", "and", "or", "xor", "sll", "sra", "srl", "beq", "bne", "blt", "bgt", "ble",
+static const char *opcodes[] = {"add", "sub", "mul", "and", "or", "xor", "sll", "sra", "srl", "beq", "bne", "blt", "bgt", "ble",
                                 "bge", "jal", "lw", "sw", "reti", "in", "out", "halt" };
 static const char *registers[] = {"zero", "imm", "v0", "a0", "a1", "a2", "a3", "t0", "t1", "t2", "s0", "s1", "s2", "gp", "sp", "ra"};
 /*********************************************************************************************************/
@@ -225,7 +226,7 @@ static void file_flow(int pass_num, FILE* assembly_prog ,FILE* output_file)
             {
                 line[colon_index] = '\0'; /*Gets only the label itself*/
                 label_temp tmp_label;
-                tmp_label.cmd_index = commands_counter;
+                tmp_label.index = commands_counter;
                 strcpy_s(tmp_label.label, MAX_LABEL_LEN, line);
                 
                 labels_array[label_counter++] = tmp_label;
