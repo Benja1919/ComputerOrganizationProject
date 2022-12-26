@@ -213,6 +213,7 @@ static void bgt_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
     if (g_cpu_regs[rs] > g_cpu_regs[rt]) {
         /* Branch if greater than- set global pc to 12 LSB's of rm */
         g_pc = g_cpu_regs[rd] & 0x00000FFF;
+        g_pc--;
     }
     else {
         /* Not equal - continue */
@@ -224,6 +225,7 @@ static void ble_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
     if (g_cpu_regs[rs] <= g_cpu_regs[rt]) {
         /* Branch if less or equal than- set global pc to 12 LSB's of rm */
         g_pc = g_cpu_regs[rd] & 0x00000FFF;
+        g_pc--;
     }
     else {
         /* Not equal - continue */
@@ -235,6 +237,7 @@ static void bge_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
     if (g_cpu_regs[rs] >= g_cpu_regs[rt]) {
         /* Branch if greater or equal than- set global pc to 12 LSB's of rm */
         g_pc = g_cpu_regs[rd] & 0x00000FFF;
+        g_pc--;
     }
     else {
         /* Not equal - continue */
@@ -257,7 +260,8 @@ static void lw_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
     if (rd == $IMM || rd == $ZERO) {
         return;
     }
-    g_cpu_regs[rd] = g_cpu_regs[(g_cpu_regs[rs] + g_cpu_regs[rt]) % DATA_MEMORY_SIZE];
+    g_cpu_regs[rd] = g_dmem[(g_cpu_regs[rs] + g_cpu_regs[rt]) % DATA_MEMORY_SIZE];
+    //printf("%X\n", g_dmem[(g_cpu_regs[rs] + g_cpu_regs[rt]) % DATA_MEMORY_SIZE]);
 }
 
 static void sw_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
@@ -272,6 +276,7 @@ static void sw_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
 static void reti_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
     g_in_handler = False;
     g_pc = g_io_regs[irqreturn];
+    g_pc--;
 }
 
 static void in_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
@@ -523,9 +528,11 @@ static void load_data_memory(FILE* data_input_file) {
     We want to read the /n char so it won't get in to the next line */
     while (fgets(line_buffer, DATA_LINE_LEN + 2, data_input_file) != NULL) {
         sscanf_s(line_buffer, "%X", &g_dmem[line_count++]);
+        //printf("%X\n", g_dmem[line_count]);
     }
     g_max_memory_index = line_count - 1;
 }
+
 
 static void load_disk_file(char const* file_name) {
     FILE* diskin_file = open_and_validate_file(file_name, "r");
@@ -580,7 +587,7 @@ static void write_memory_file(char const* file_name) {
     /* Writes the memory data file */
     FILE* output_memory_file = open_and_validate_file(file_name, "w");
     for (int i = 0; i <= g_max_memory_index; i++) {
-        fprintf(output_memory_file, "%08X\n", g_dmem[i]);
+        fprintf(output_memory_file, "%05X\n", g_dmem[i]);
     }
     fclose(output_memory_file);
 }
@@ -635,7 +642,11 @@ int main(int argc, char const* argv[])
     g_irq2in_file = open_and_validate_file(argv[3], "r"); /* Irq2 file */
     fscanf_s(g_irq2in_file, "%d\n", &g_next_irq2);
 
+    //printf("%d", sizeof(g_dmem));
     load_instructions(input_cmd_file); /* Load instructions and store them in g_cmd_arr */
+    fclose(input_cmd_file);
+    input_cmd_file = open_and_validate_file(argv[1], "r"); /* memin.txt */
+    load_data_memory(input_cmd_file);
     load_disk_file(argv[2]); /* Load disk file */
     exec_instructions(output_trace_file); /* Execure program */
     write_memory_file(argv[4]); /* Write memout file with the update memory */

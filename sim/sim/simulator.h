@@ -3,7 +3,7 @@
 #define DATA_MEMORY_SIZE 4096
 #define MAX_ASSEMBLY_LINES 4096
 #define INSTRUCTION_LINE_LEN 20
-#define DATA_LINE_LEN 8 //??
+#define DATA_LINE_LEN 5 
 #define INPUT_INSTR_FILE_NAME "memin.txt"
 #define INPUT_DATA_FILE_NAME "dmemin.txt" //remove
 
