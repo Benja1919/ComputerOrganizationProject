@@ -1,2 +1,6 @@
 ﻿  simulator.c
+C:\Users\benco\OneDrive - mail.tau.ac.il\מסמכים\אחר\לימודים\אוניברסיטה\תל אביב\שנה ג\סמסטר א\מבנה המחשב\שלנו\sim\sim\simulator.c(580,9): warning C4101: 'tmp_opcode': unreferenced local variable
+C:\Users\benco\OneDrive - mail.tau.ac.il\מסמכים\אחר\לימודים\אוניברסיטה\תל אביב\שנה ג\סמסטר א\מבנה המחשב\שלנו\sim\sim\simulator.c(578,9): warning C4101: 'tmp_rt': unreferenced local variable
+C:\Users\benco\OneDrive - mail.tau.ac.il\מסמכים\אחר\לימודים\אוניברסיטה\תל אביב\שנה ג\סמסטר א\מבנה המחשב\שלנו\sim\sim\simulator.c(577,9): warning C4101: 'tmp_rs': unreferenced local variable
+C:\Users\benco\OneDrive - mail.tau.ac.il\מסמכים\אחר\לימודים\אוניברסיטה\תל אביב\שנה ג\סמסטר א\מבנה המחשב\שלנו\sim\sim\simulator.c(579,9): warning C4101: 'tmp_rd': unreferenced local variable
   sim.vcxproj -> C:\Users\benco\OneDrive - mail.tau.ac.il\מסמכים\אחר\לימודים\אוניברסיטה\תל אביב\שנה ג\סמסטר א\מבנה המחשב\שלנו\sim\Debug\sim.exe
