@@ -2,12 +2,15 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
+#include <math.h>
 #include "simulator.h"
 
 static int g_cpu_regs[CPU_REGS_NUM]; /* CPU registers (32 bits each) */
 static int g_io_regs[IO_REGS_NUM]; /* IO registers */
 asm_cmd_t g_cmd_arr[MAX_ASSEMBLY_LINES]; /* Commands array */
 static int g_in_handler = False; /* Flag indicating running in interrupt handler */
+static int reti_imm = False; /* Flag indicating running in interrupt handler */
 static unsigned char g_monitor[MONITOR_DIM * MONITOR_DIM]; /* Global monitor buffer */
 static int g_dmem[DATA_MEMORY_SIZE]; /* Data memory */
 static int g_pc = 0; /* Program counter */
@@ -69,15 +72,15 @@ static void out_cmd(cpu_reg_e, cpu_reg_e, cpu_reg_e);
 static void halt_cmd(cpu_reg_e, cpu_reg_e, cpu_reg_e);
 
 static void update_hw_reg_trace_file(char* type, int io_reg_index, int data) {
-    fprintf(g_io_reg_trace_file, "%lld %s %s %08X\n", g_cycles, type, g_io_regs_arr[io_reg_index], data);
+    fprintf(g_io_reg_trace_file, "%lld %s %s %08X\n", g_cycles - 1, type, g_io_regs_arr[io_reg_index], data);
 }
 
 static void update_leds_file() {
-    fprintf(g_leds_file, "%lld %08X\n", g_cycles, g_io_regs[leds]);
+    fprintf(g_leds_file, "%lld %08X\n", g_cycles - 1, g_io_regs[leds]);
 }
 
 static void update_7segment_file() {
-    fprintf(g_7segment_file, "%lld %08X\n", g_cycles, g_io_regs[display7seg]);
+    fprintf(g_7segment_file, "%lld %08X\n", g_cycles - 1, g_io_regs[display7seg]);
 }
 
 /* Array of function pointers used to call the right operation
@@ -180,6 +183,7 @@ static void beq_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
     if (g_cpu_regs[rs] == g_cpu_regs[rt]) {
         /* Branch if equal - set global pc to 12 LSB's of rm */
         g_pc = g_cpu_regs[rd] & 0x00000FFF;
+        //g_pc--;
     }
     else {
         /* Not equal - continue */
@@ -261,7 +265,6 @@ static void lw_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
         return;
     }
     g_cpu_regs[rd] = g_dmem[(g_cpu_regs[rs] + g_cpu_regs[rt]) % DATA_MEMORY_SIZE];
-    //printf("%X\n", g_dmem[(g_cpu_regs[rs] + g_cpu_regs[rt]) % DATA_MEMORY_SIZE]);
 }
 
 static void sw_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
@@ -275,9 +278,11 @@ static void sw_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
 
 static void reti_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
     g_in_handler = False;
-    g_pc = g_io_regs[irqreturn];
-    g_pc--;
-    
+    g_pc = g_io_regs[irqreturn] + 1;
+    if (reti_imm) {//with imm
+        g_pc++;
+    }
+    reti_imm = False;
 }
 
 static void in_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt) {
@@ -344,9 +349,13 @@ static int is_irq() {
 }
 
 static void update_irq2() {
-    if (g_cycles >= g_next_irq2) {
+    int tmp_irq2 = g_next_irq2;
+    if (g_cycles > g_next_irq2) {
         g_io_regs[irq2status] = True;
         fscanf_s(g_irq2in_file, "%d\n", &g_next_irq2);
+        if (tmp_irq2 == g_next_irq2) { //no new line so no need to irq2
+            g_next_irq2 = INT_MAX; //so no other irq2 will occur
+        }
     }
     else {
         g_io_regs[irq2status] = False;
@@ -354,16 +363,19 @@ static void update_irq2() {
     /*Interupt handler is responsible for setting the status back to false*/
 }
 
-static void update_clocks(asm_cmd_t* curr_cmd) {
+static void update_clocks_after(asm_cmd_t* curr_cmd) {
     int tmp_opcode = (int)curr_cmd->opcode;
+    if (tmp_opcode == 16 || tmp_opcode == 17) {//lw or sw
+        g_io_regs[clks] += 1; /* Updates cycle clock */
+        g_cycles += 1; /* Updates cycles counter for logging */
+    }
+}
+
+static void update_clocks_before(asm_cmd_t* curr_cmd) {
     int tmp_rs = (int)curr_cmd->rs;
     int tmp_rt = (int)curr_cmd->rt;
     int tmp_rd = (int)curr_cmd->rd;
-    if (tmp_opcode == 16 || tmp_opcode == 17) {//lw or sw
-        g_io_regs[clks] += 3; /* Updates cycle clock */
-        g_cycles += 3; /* Updates cycles counter for logging */
-    }
-    else if (tmp_rs == 1 || tmp_rt == 1 || tmp_rd == 1) { //I format and not lw/sw
+    if (tmp_rs == 1 || tmp_rt == 1 || tmp_rd == 1) { //I format and not lw/sw
         g_io_regs[clks] += 2; /* Updates cycle clock */
         g_cycles += 2; /* Updates cycles counter for logging */
     }
@@ -376,7 +388,6 @@ static void update_clocks(asm_cmd_t* curr_cmd) {
 static int validate_opcode_and_regs(asm_cmd_t* cmd) {
     if (cmd->opcode < 0 || cmd->opcode >= OPCODES_NUM) {
         printf("Opcode is not valid. continuing to next instruction\n");
-        //printf("%s\n", cmd->opcode);
         return -1;
     }
     if (cmd->rt < 0 || cmd->rt >= CPU_REGS_NUM) {
@@ -443,7 +454,6 @@ static void load_instructions(FILE* instr_file) {
             fgets(line, INSTRUCTION_LINE_LEN + 2, instr_file);
             sscanf_s(line, "%llX", &raw);
             cmd->imm = (raw) & 0xFFFFF;
-            //printf("%llX\n", cmd->imm);
             g_cmd_arr[instructions_count] = curr_cmd;
             instructions_count += 2;
         }
@@ -551,7 +561,6 @@ static void load_data_memory(FILE* data_input_file) {
     We want to read the /n char so it won't get in to the next line */
     while (fgets(line_buffer, DATA_LINE_LEN + 2, data_input_file) != NULL) {
         sscanf_s(line_buffer, "%X", &g_dmem[line_count++]);
-        //printf("%X\n", g_dmem[line_count]);
     }
     g_max_memory_index = line_count - 1;
 }
@@ -573,59 +582,52 @@ static void load_disk_file(char const* file_name) {
 static void exec_instructions(FILE* output_trace_file) {
     g_is_running = True;
     asm_cmd_t* curr_cmd;
-    int line = 0;
-    int tmp_rs;
-    int tmp_rt;
-    int tmp_rd;
-    int tmp_opcode;
+    int tmp_rs = 0;
+    int tmp_rt = 0;
+    int tmp_rd = 0;
+    int tmp_opcode = 0;
     while (g_is_running) {
-        if (g_in_handler == False && is_irq()) {  /* Check for interrupts */
-            printf("%s\n", "entered");
-            g_in_handler = True; /* Now in interrupt handler */
-            g_io_regs[irqreturn] = g_pc; /* Save return address */
-            //printf("%d\n", g_io_regs[irqreturn]);
-            g_pc = g_io_regs[irqhandler]; /* Jump to handler */
-            //printf("%d\n", g_pc);
-        }
-        //printf("%s\n", "before fetch, cycles:");
-        //printf("%llu\n", g_cycles);
-        //printf("%s\n", "before fetch, irq2status:");
-        //printf("%d\n", g_io_regs[irq2status]);
         curr_cmd = &g_cmd_arr[g_pc]; /* Fetch current command to execute */
-        line++;
-        update_trace_file(output_trace_file, curr_cmd); /* Update trace file before executing command */
-        if (validate_opcode_and_regs(curr_cmd) == 0) {
-        //if (validate_opcode_and_regs(curr_cmd) == 0 && g_in_handler == True) {
-            exec_cmd(curr_cmd); /* Execute only when the command is valid */
-        }
+        update_clocks_before(curr_cmd);
         int tmp_opcode = (int)curr_cmd->opcode;
         int tmp_rs = (int)curr_cmd->rs;
         int tmp_rt = (int)curr_cmd->rt;
         int tmp_rd = (int)curr_cmd->rd;
+         /* Update trace file before executing command */
+        if (validate_opcode_and_regs(curr_cmd) == 0) {
+            update_trace_file(output_trace_file, curr_cmd);
+            exec_cmd(curr_cmd); /* Execute only when the command is valid */
+        }
+        update_clocks_after(curr_cmd);
         update_monitor(); /* Check for monitor updates */
         update_disk(); /* Check for disk updates */
         update_timer();  /* Update timer */
-        //printf("%s\n", "before:");
-        //printf("%llu\n", g_cycles);
-        //printf("%s\n", "status:");
-        //printf("%d\n", g_io_regs[irq2status]);
         update_irq2(); /* Updates value of next interrupt time if needed */
-        printf("%llu\n", g_cycles);
-        printf("%ld\n", g_next_irq2);
-        //printf("%s\n", "after:");
-        //printf("%s\n", "status:");
-        //printf("%d\n", g_io_regs[irq2status]);
-        update_clocks(curr_cmd);
-        //printf("%llu\n", g_cycles);
-        /* If the command is not branch or jump than advance PC */
-        //(g_io_regs[irq2enable] && g_io_regs[irq2status])
+        if (g_in_handler == False && is_irq()) {  /* Check for interrupts */
+            g_in_handler = True; /* Now in interrupt handler */
+            if (is_jump_or_branch(curr_cmd->opcode)) {
+                g_io_regs[irqreturn] = g_pc - 1; /* Save return address */
+            }
+            else {
+                g_io_regs[irqreturn] = g_pc;
+            }
+            if (tmp_rs == 1 || tmp_rt == 1 || tmp_rd == 1) {
+                reti_imm = True;
+            }
+            g_pc = g_io_regs[irqhandler]; /* Jump to handler */
+            if (!is_jump_or_branch(curr_cmd->opcode)) {
+                g_pc -= 2;
+            }
+            else {
+                g_pc -= 1;
+            }
+        }
         if (!is_jump_or_branch(curr_cmd->opcode)) {
             g_pc++;
         }
-        if (tmp_rs == 1 || tmp_rt == 1 || tmp_rd == 1) {//with imm
+        if ((tmp_rs == 1 || tmp_rt == 1 || tmp_rd == 1) && tmp_opcode != 9) {//with imm
             g_pc++;
         }
-        
     }
 }
 
@@ -641,7 +643,7 @@ static void write_memory_file(char const* file_name) {
 static void write_regs_file(char const* file_name) {
     /* Writes the regs file */
     FILE* output_regs_file = open_and_validate_file(file_name, "w");
-    for (int i = 3; i < CPU_REGS_NUM; i++) {
+    for (int i = 2; i < CPU_REGS_NUM; i++) {
         fprintf(output_regs_file, "%08X\n", g_cpu_regs[i]);
     }
     fclose(output_regs_file);
@@ -654,13 +656,14 @@ static void write_cycles_file(char const* file_name) {
 }
 
 static void write_disk_file(char const* file_name) {
+    int t = 0;
     /* Writes the disk data file */
     FILE* output_disk_file = open_and_validate_file(file_name, "w");
     for (int i = 0; i < DISK_SECTOR_NUM; i++) {
         for (int j = 0; j < DISK_SECTOR_SIZE; j++) {
-            fprintf(output_disk_file, "%08X\n", (g_disk.data)[i][j]);
+            fprintf(output_disk_file, "%05X\n", (g_disk.data)[i][j]);
+            }
         }
-    }
     fclose(output_disk_file);
 }
 
@@ -687,8 +690,6 @@ int main(int argc, char const* argv[])
     g_7segment_file = open_and_validate_file(argv[10], "w"); /* 7segment file */
     g_irq2in_file = open_and_validate_file(argv[3], "r"); /* Irq2 file */
     fscanf_s(g_irq2in_file, "%d\n", &g_next_irq2);
-  //  printf("%d", g_next_irq2);
-
     load_instructions(input_cmd_file); /* Load instructions and store them in g_cmd_arr */
     fclose(input_cmd_file);
     input_cmd_file = open_and_validate_file(argv[1], "r"); /* memin.txt */
