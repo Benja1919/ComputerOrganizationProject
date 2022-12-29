@@ -6,6 +6,9 @@
 #include <math.h>
 #include "simulator.h"
 
+#define SET_DISK_VALUE(_sector, _index, _value)                         if ((_sector) <  && (_index) < 128) { g_disk.data[(_sector)][(_index)] = (_value); }
+
+
 static int g_cpu_regs[CPU_REGS_NUM]; /* CPU registers (32 bits each) */
 static int g_io_regs[IO_REGS_NUM]; /* IO registers */
 asm_cmd_t g_cmd_arr[MAX_ASSEMBLY_LINES]; /* Commands array */
@@ -405,22 +408,6 @@ static int validate_opcode_and_regs(asm_cmd_t* cmd) {
     return 0;
 }
 
-//static void parse_line_to_cmd(char* line, asm_cmd_t* cmd) {
-    /* Each command is 48 bits so 64 bits are required */
-  //  unsigned long long raw;
-  //  sscanf_s(line, "%llX", &raw);
-
-    /* construct the command object */
-  //  cmd->rt = (raw) & 0xF;
-  //  cmd->rs = (raw >> 4) & 0xF;
-  //  cmd->rd = (raw >> 8) & 0xF;
-  //  cmd->opcode = (raw >> 12) & 0xFF;
-   // if (cmd->rt == 1 || cmd->rs == 1) {
-      //  cmd->imm = sscanf_s(line, "%llX", &raw);
-    //}
-    //cmd->raw_cmd = raw;
-//}
-
 static void exec_cmd(asm_cmd_t* cmd) {
     /* Execute a command using the functions pointers array */
     update_immediates(cmd); /* $imm1 and $imm2 should hold immediets value */
@@ -572,8 +559,8 @@ static void load_disk_file(char const* file_name) {
     int line_count = 0;
     /* stops when either (n-1) characters are read, or /n is read
     We want to read the /n char so it won't get in to the next line */
-    while (fgets(line_buffer, DATA_LINE_LEN + 2, diskin_file) != NULL) {
-        sscanf_s(line_buffer, "%hhX", &g_disk.data[line_count / DISK_SECTOR_SIZE][line_count % DISK_SECTOR_SIZE]);
+    while (fgets(line_buffer, DATA_LINE_LEN + 2, diskin_file) != NULL){
+        sscanf_s(line_buffer, "%llX", &g_disk.data[line_count / DISK_SECTOR_SIZE][line_count % DISK_SECTOR_SIZE]);
         line_count++;
     }
     fclose(diskin_file);
@@ -661,7 +648,7 @@ static void write_disk_file(char const* file_name) {
     FILE* output_disk_file = open_and_validate_file(file_name, "w");
     for (int i = 0; i < DISK_SECTOR_NUM; i++) {
         for (int j = 0; j < DISK_SECTOR_SIZE; j++) {
-            fprintf(output_disk_file, "%05X\n", (g_disk.data)[i][j]);
+            fprintf(output_disk_file, "%05X\n", (int)(g_disk.data)[i][j]);
             }
         }
     fclose(output_disk_file);

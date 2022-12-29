@@ -3,7 +3,7 @@
 #define DATA_MEMORY_SIZE 4096
 #define MAX_ASSEMBLY_LINES 4096
 #define INSTRUCTION_LINE_LEN 20
-#define DATA_LINE_LEN 5 
+#define DATA_LINE_LEN 500 
 #define INPUT_INSTR_FILE_NAME "memin.txt"
 #define INPUT_DATA_FILE_NAME "dmemin.txt" //remove
 
@@ -76,7 +76,7 @@ typedef struct {
 } asm_cmd_t;
 
 typedef struct {
-    unsigned char data[DISK_SECTOR_NUM][DISK_SECTOR_SIZE];
+    unsigned long long int data[DISK_SECTOR_NUM][DISK_SECTOR_SIZE];
     unsigned int time_in_cmd;
 } disk_t;
 
