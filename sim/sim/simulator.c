@@ -3,9 +3,9 @@
                                      id 208685784, 315416057
                 In this file we implemented a
                                                                                                         */
-/********************************************************************************************************/
+                                                                                                        /********************************************************************************************************/
 
-/*********************************************Includes****************************************************/
+                                                                                                        /*********************************************Includes****************************************************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -353,7 +353,7 @@ static int immediate_sign_extension(int imm) {
     /* Any immediate is stored in 12 bits in SIMP instruction
     This function assumes num is the shepe of 0x00000###
     Check if the 12th bit is on and extend accordingly */
-    if (imm >= 0x800) { // 0x800 is 1000 0000 0000 in binary
+    if (imm > 0x8000) { // 0x800 is 1000 0000 0000 in binary
         return imm | 0xFFFFF000;
     }
     return imm;
@@ -456,9 +456,9 @@ static void load_instruction_file(FILE* instr_file) {
         cmd->rd = (raw >> 8) & 0xF;
         cmd->opcode = (raw >> 12) & 0xFF;
         cmd->raw_cmd = raw;
-        tmp_rs = (int) cmd->rs;
-        tmp_rt = (int) cmd->rt;
-        tmp_rd = (int) cmd->rd;
+        tmp_rs = (int)cmd->rs;
+        tmp_rt = (int)cmd->rt;
+        tmp_rd = (int)cmd->rd;
         if (tmp_rd == 1 || tmp_rs == 1 || tmp_rt == 1) {
             fgets(line, INSTRUCTION_LINE_LEN + 2, instr_file);
             sscanf_s(line, "%llX", &raw);
@@ -470,7 +470,7 @@ static void load_instruction_file(FILE* instr_file) {
             cmd->imm = 0;
             commands_array[instructions_count] = curr_cmd;
             instructions_count++;
-        }        
+        }
     }
 }
 
@@ -581,7 +581,7 @@ static void load_disk_file(char const* file_name) {
     int line_count = 0;
     /* stops when either (n-1) characters are read, or /n is read
     We want to read the /n char so it won't get in to the next line */
-    while (fgets(line_buffer, DATA_LINE_LEN + 2, diskin_file) != NULL){
+    while (fgets(line_buffer, DATA_LINE_LEN + 2, diskin_file) != NULL) {
         sscanf_s(line_buffer, "%llX", &g_disk.data[line_count / DISK_SECTOR_SIZE][line_count % DISK_SECTOR_SIZE]);
         line_count++;
     }
@@ -597,12 +597,12 @@ static void execute_instructions(FILE* output_trace_file) {
     int tmp_opcode = 0;
     while (g_is_running) {
         curr_cmd = &commands_array[g_pc]; /* Fetch current command to execute */
+        /* Update trace file before executing command */
         update_clocks_before(curr_cmd);
         int tmp_opcode = (int)curr_cmd->opcode;
         int tmp_rs = (int)curr_cmd->rs;
         int tmp_rt = (int)curr_cmd->rt;
         int tmp_rd = (int)curr_cmd->rd;
-         /* Update trace file before executing command */
         if (registers_and_opcode_validation(curr_cmd) == 0) {
             update_trace_file(output_trace_file, curr_cmd);
             command_execution(curr_cmd); /* Execute only when the command is valid */
@@ -671,8 +671,8 @@ static void write_disk_file(char const* file_name) {
     for (int i = 0; i < DISK_SECTOR_NUM; i++) {
         for (int j = 0; j < DISK_SECTOR_SIZE; j++) {
             fprintf(output_disk_file, "%05X\n", (int)(g_disk.data)[i][j]);
-            }
         }
+    }
     fclose(output_disk_file);
 }
 
