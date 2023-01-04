@@ -32,7 +32,7 @@ static FILE* g_leds_file; /* leds file */
 static FILE* g_7segment_file; /* 7 segment file */
 static FILE* g_irq2in_file; /* Irq2 file */
 int g_max_memory_index; /* Holds the max non empty index in data mem array */
-static unsigned long long g_cycles = 0; /* Usngined 64 bit for clock cycles counter */
+static unsigned long g_cycles = 0; /* Usngined 32 bit for clock cycles counter */
 
 static const char* io_registers_arr[] = { "irq0enable","irq1enable","irq2enable","irq0status","irq1status","irq2status","irqhandler",
                                       "irqreturn","clks","leds","display7seg","timerenable","timercurrent","timermax","diskcmd",
@@ -95,15 +95,15 @@ static void write_monitor_files(char const* file_txt_name, char const* file_yuv_
 
 
 static void update_hw_reg_trace_file(char* type, int io_reg_index, int data) {
-    fprintf(g_io_reg_trace_file, "%lld %s %s %08X\n", g_cycles - 1, type, io_registers_arr[io_reg_index], data);
+    fprintf(g_io_reg_trace_file, "%ld %s %s %08X\n", g_cycles - 1, type, io_registers_arr[io_reg_index], data);
 }
 
 static void update_leds_file() {
-    fprintf(g_leds_file, "%lld %08X\n", g_cycles - 1, io_registers[leds]);
+    fprintf(g_leds_file, "%ld %08X\n", g_cycles - 1, io_registers[leds]);
 }
 
 static void update_7segment_file() {
-    fprintf(g_7segment_file, "%lld %08X\n", g_cycles - 1, io_registers[display7seg]);
+    fprintf(g_7segment_file, "%ld %08X\n", g_cycles - 1, io_registers[display7seg]);
 }
 
 /* Array of function pointers used to call the right operation
@@ -350,10 +350,10 @@ static FILE* file_validation(char const* file_name, char const* perms) {
 }
 
 static int immediate_sign_extension(int imm) {
-    /* Any immediate is stored in 12 bits in SIMP instruction
+    /* Any immediate is stored in 20 bits in SIMP instruction
     This function assumes num is the shepe of 0x00000###
-    Check if the 12th bit is on and extend accordingly */
-    if (imm > 0x8000) { // 0x800 is 1000 0000 0000 in binary
+    Check if the 19th bit is on and extend accordingly */
+    if (imm > 0x80000) { // 0x80000 is 1000 0000 0000 0000 0000 in binary
         return imm | 0xFFFFF000;
     }
     return imm;
@@ -375,7 +375,7 @@ static int is_irq() {
 
 static void update_irq2() {
     int tmp_irq2 = g_next_irq2;
-    if (g_cycles > g_next_irq2) {
+    if ((int)g_cycles > g_next_irq2) {
         io_registers[irq2status] = True;
         fscanf_s(g_irq2in_file, "%d\n", &g_next_irq2);
         if (tmp_irq2 == g_next_irq2) { //no new line so no need to irq2
@@ -395,11 +395,14 @@ static void update_clocks_before(asm_cmd_t* curr_cmd) {
     if (tmp_rs == 1 || tmp_rt == 1 || tmp_rd == 1) { //I format and not lw/sw
         io_registers[clks] += 2; /* Updates cycle clock */
         g_cycles += 2; /* Updates cycles counter for logging */
+        io_registers[timercurrent] += 2;
     }
     else { //R format
         io_registers[clks] += 1; /* Updates cycle clock */
         g_cycles += 1; /* Updates cycles counter for logging */
+        io_registers[timercurrent] += 1;
     }
+
 }
 
 static void update_clocks_after(asm_cmd_t* curr_cmd) {
@@ -407,11 +410,13 @@ static void update_clocks_after(asm_cmd_t* curr_cmd) {
     if (tmp_opcode == 16 || tmp_opcode == 17) {//lw or sw
         io_registers[clks] += 1; /* Updates cycle clock */
         g_cycles += 1; /* Updates cycles counter for logging */
+        io_registers[timercurrent] += 1;
     }
 }
 
 static int registers_and_opcode_validation(asm_cmd_t* cmd) {
     if (cmd->opcode < 0 || cmd->opcode >= OPCODES_NUM) {
+        printf("%d\n", (int)cmd ->opcode);
         printf("Opcode is not valid. continuing to next instruction\n");
         return -1;
     }
@@ -420,6 +425,7 @@ static int registers_and_opcode_validation(asm_cmd_t* cmd) {
         return -1;
     }
     if (cmd->rs < 0 || cmd->rs >= CPU_REGS_NUM) {
+        printf("%d\n", (int)cmd->rs);
         printf("Rs value is not valid. continuing to next instruction\n");
         return -1;
     }
@@ -448,8 +454,8 @@ static void load_instruction_file(FILE* instr_file) {
     We want to read the /n char so it won't get in to the next line */
     while (fgets(line, INSTRUCTION_LINE_LEN + 2, instr_file) != NULL) {
         cmd = &curr_cmd;
-        unsigned long long raw;
-        sscanf_s(line, "%llX", &raw);
+        unsigned long raw;
+        sscanf_s(line, "%lX", &raw);
         /* construct the command object */
         cmd->rt = (raw) & 0xF;
         cmd->rs = (raw >> 4) & 0xF;
@@ -461,7 +467,7 @@ static void load_instruction_file(FILE* instr_file) {
         tmp_rd = (int)cmd->rd;
         if (tmp_rd == 1 || tmp_rs == 1 || tmp_rt == 1) {
             fgets(line, INSTRUCTION_LINE_LEN + 2, instr_file);
-            sscanf_s(line, "%llX", &raw);
+            sscanf_s(line, "%lX", &raw);
             cmd->imm = (raw) & 0xFFFFF;
             commands_array[instructions_count] = curr_cmd;
             instructions_count += 2;
@@ -476,7 +482,7 @@ static void load_instruction_file(FILE* instr_file) {
 
 static void update_trace_file(FILE* output_trace_file, asm_cmd_t* curr_cmd) {
     /* Writes the trace file for current variables status */
-    fprintf(output_trace_file, "%03X %05llX 00000000 %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X\n",
+    fprintf(output_trace_file, "%03X %05lX 00000000 %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X %08X\n",
         g_pc,
         curr_cmd->raw_cmd,
         immediate_sign_extension(curr_cmd->imm),
@@ -498,14 +504,11 @@ static void update_trace_file(FILE* output_trace_file, asm_cmd_t* curr_cmd) {
 
 static void update_timer() {
     if (io_registers[timerenable] == True) {
-        io_registers[timercurrent]++;
         if (io_registers[timercurrent] == io_registers[timermax]) {
-            /* Timer is enabled and it's time to interrupt */
+            /*interrupt */
             io_registers[irq0status] = True;
-            /* reset timer */
             io_registers[timercurrent] = 0;
         }
-        /*Interupt handler is responsible for setting the status back to false*/
     }
 }
 
@@ -537,7 +540,9 @@ static void update_disk() {
         case 1:
             /* Read command
             Copy from disk to memory */
+            printf("%d\n", g_disk.data[sector][2]);
             memcpy(&memory_array[buffer_addr], g_disk.data[sector], DISK_SECTOR_SIZE);
+            printf("%d\n", memory_array[2]);
             break;
         case 2:
             /* Write command
@@ -582,7 +587,7 @@ static void load_disk_file(char const* file_name) {
     /* stops when either (n-1) characters are read, or /n is read
     We want to read the /n char so it won't get in to the next line */
     while (fgets(line_buffer, DATA_LINE_LEN + 2, diskin_file) != NULL) {
-        sscanf_s(line_buffer, "%llX", &g_disk.data[line_count / DISK_SECTOR_SIZE][line_count % DISK_SECTOR_SIZE]);
+        sscanf_s(line_buffer, "%lX", &g_disk.data[line_count / DISK_SECTOR_SIZE][line_count % DISK_SECTOR_SIZE]);
         line_count++;
     }
     fclose(diskin_file);
@@ -597,17 +602,17 @@ static void execute_instructions(FILE* output_trace_file) {
     int tmp_opcode = 0;
     while (g_is_running) {
         curr_cmd = &commands_array[g_pc]; /* Fetch current command to execute */
-        /* Update trace file before executing command */
-        update_clocks_before(curr_cmd);
         int tmp_opcode = (int)curr_cmd->opcode;
         int tmp_rs = (int)curr_cmd->rs;
         int tmp_rt = (int)curr_cmd->rt;
         int tmp_rd = (int)curr_cmd->rd;
+        /* Update trace file before executing command */
         if (registers_and_opcode_validation(curr_cmd) == 0) {
+            update_clocks_before(curr_cmd);
             update_trace_file(output_trace_file, curr_cmd);
             command_execution(curr_cmd); /* Execute only when the command is valid */
+            update_clocks_after(curr_cmd);
         }
-        update_clocks_after(curr_cmd);
         update_monitor(); /* Check for monitor updates */
         update_disk(); /* Check for disk updates */
         update_timer();  /* Update timer */
@@ -660,7 +665,7 @@ static void write_regs_file(char const* file_name) {
 
 static void write_cycles_file(char const* file_name) {
     FILE* output_cycles_file = file_validation(file_name, "w");
-    fprintf(output_cycles_file, "%lld", g_cycles);
+    fprintf(output_cycles_file, "%ld", g_cycles);
     fclose(output_cycles_file);
 }
 

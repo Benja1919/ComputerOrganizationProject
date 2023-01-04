@@ -1,30 +1,12 @@
 MAIN:
-	add $t0, $imm1, $zero, $zero, 7, 0 			# 7 sectors  
-	add $s0, $zero, $zero, $zero, 0, 0 			# $s0 = 0
-	out $zero, $imm1, $zero, $s0, 16, 0			# Set diskbuffer to $0
-	
-FOR:	
-	blt $zero, $t0, $imm1, $imm2, 0, RETURN 	# break if $t0 (started at 7) is less than 0
-	add $t2, $t0, $imm1, $zero, 1, 0 			# $t2 = $t0 + 1 (the next sector)
-
-  	jal $ra, $zero, $zero, $imm2, 0, WAIT		# Wait till disk is ready
+	add $t0, $zero, $imm, 1			 			# $t0 = num of sectors = 2 sectors (0,1) 
+	add $s0, $zero, $imm, 0			 			# $s0 = 0
+	add $s1, $zero, $imm, 1						# $s1 = const 1
+	out $s0, $imm, $zero, 16					# ioregister[16 = diskbuffer] = $s0 = 0
+	add $t1, $zero, $zero, 0					# $t1 = index = 0
 	# Read data from sector
-	out $zero, $imm1, $zero, $t0, 15, 0			# ioregister[15 = disksector] = $t0
-	out $zero, $imm1, $zero, $imm2, 14, 1		# ioregister[14 = diskcmd] = 1 for read
-	 
-	jal $ra, $zero, $zero, $imm2, 0, WAIT		# Wait till disk is ready
-	# Write data to sector
-	out $zero, $imm1, $zero, $t2, 15, 0			# ioregister[15 = disksector] = $t2 = $t0 + 1
-	out $zero, $imm1, $zero, $imm2, 14, 2		# ioregister[14 = diskcmd] = 2 for write
-
-	add $t0, $t0, $imm1, $zero, -1, 0 			# $t0--
-	beq $zero, $zero, $zero, $imm2, 0, FOR		# Jump to next sector
-
-WAIT:
-	in $t1, $imm1, $zero, $zero, 17, 0			# Get diskstatus
-	beq $zero, $t1, $imm1, $imm2, 1, WAIT		# While disk is busy
-	beq $zero, $zero, $zero, $ra, 0, 0			# Return to loop
-	
-	
-RETURN:
-	halt $zero, $zero, $zero, $zero, 0, 0		# End	
+	out $t1, $imm, $zero, 15					# ioregister[15 = disksector] = $t1
+	out $s1, $imm, $zero, 14					# ioregister[14 = diskcmd] = 1 for read
+	in $t2, $imm, $zero, 16						# $t2 = ioregister[16 = diskbuffer]
+	add $t1, $t1, $imm, 1						# $t1++
+	halt $zero, $zero, $zero, 0					# End	

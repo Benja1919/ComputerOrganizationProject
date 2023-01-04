@@ -1,5 +1,5 @@
 MAIN:
-	add $s0, $zero, $imm, 0x8000	# minus
+	add $s0, $zero, $imm, 0x80000	# max value before minus
 	add $s1, $zero, $imm, 0x100		# starting location
 	add $t0, $zero, $zero, 0		# first fib element
 	sw $t0, $zero, $s1, 0	        # load first element

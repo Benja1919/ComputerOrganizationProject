@@ -72,11 +72,11 @@ typedef struct {
     cpu_reg_e rs;
     cpu_reg_e rt;
     int imm;
-    unsigned long long raw_cmd;
+    unsigned long raw_cmd;
 } asm_cmd_t;
 
 typedef struct {
-    unsigned long long int data[DISK_SECTOR_NUM][DISK_SECTOR_SIZE];
+    unsigned long int data[DISK_SECTOR_NUM][DISK_SECTOR_SIZE];
     unsigned int time_in_cmd;
 } disk_t;
 
