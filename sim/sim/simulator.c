@@ -416,7 +416,6 @@ static void update_clocks_after(asm_cmd_t* curr_cmd) {
 
 static int registers_and_opcode_validation(asm_cmd_t* cmd) {
     if (cmd->opcode < 0 || cmd->opcode >= OPCODES_NUM) {
-        printf("%d\n", (int)cmd ->opcode);
         printf("Opcode is not valid. continuing to next instruction\n");
         return -1;
     }
@@ -425,7 +424,6 @@ static int registers_and_opcode_validation(asm_cmd_t* cmd) {
         return -1;
     }
     if (cmd->rs < 0 || cmd->rs >= CPU_REGS_NUM) {
-        printf("%d\n", (int)cmd->rs);
         printf("Rs value is not valid. continuing to next instruction\n");
         return -1;
     }
@@ -540,9 +538,7 @@ static void update_disk() {
         case 1:
             /* Read command
             Copy from disk to memory */
-            printf("%d\n", g_disk.data[sector][2]);
             memcpy(&memory_array[buffer_addr], g_disk.data[sector], DISK_SECTOR_SIZE);
-            printf("%d\n", memory_array[2]);
             break;
         case 2:
             /* Write command
