@@ -96,18 +96,6 @@ static int num_of_label(char* label)
     return -1;
 }
 
-// static int does_line_contain_label(char *line) {
-//     for (int i = 0; i < MAX_LABEL_LEN; i++) {
-//         if (line[i] == ':') { 
-//             return 1;
-//         }
-//         if (line[i] == '\0') {
-//             return 0;
-//         }
-//     }
-//     return 0;
-// }
-
 static int check_if_label(char* imm)
 {
     /*checks if the given imm is a label*/
