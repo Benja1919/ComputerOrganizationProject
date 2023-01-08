@@ -20,13 +20,13 @@
 /*********************************************************************************************************/
 
 /*****************************************Consts, Statics & Arrays****************************************/
-static int cpu_registers[CPU_REGS_NUM]; /* CPU registers*/
-static int io_registers[IO_REGS_NUM]; /* IO registers */
+static int32_t cpu_registers[CPU_REGS_NUM]; /* CPU registers*/
+static int32_t io_registers[IO_REGS_NUM]; /* IO registers */
 asm_cmd_t commands_array[MAX_ASSEMBLY_LINES]; /* Commands array */
 static int g_in_handler = False; /*Handler indicator*/
 static int reti_imm = False; /*Immediate indicator*/
 static unsigned char g_monitor[MONITOR_DIM * MONITOR_DIM]; /*monitor's buffer*/
-static int memory_array[DATA_MEMORY_SIZE]; /*memory's array*/
+static unsigned long int memory_array[DATA_MEMORY_SIZE]; /*memory's array*/
 static int g_pc = 0; /*Program_counter*/
 static int g_is_running; /*until getting Halt*/
 static int g_next_irq2 = -1; /*the next irq2 event*/
@@ -283,7 +283,7 @@ static void sw_cmd(cpu_reg_e rd, cpu_reg_e rs, cpu_reg_e rt)
     memory_array[(cpu_registers[rs] + cpu_registers[rt]) % DATA_MEMORY_SIZE] = cpu_registers[rd];
     if (cpu_registers[rd] != 0) {
         memory_address = cpu_registers[rs] + cpu_registers[rt];
-        g_max_memory_index = MAX(g_max_memory_index, memory_address);
+     //   g_max_memory_index = MAX(g_max_memory_index, memory_address);
     }
 }
 
@@ -519,11 +519,12 @@ static void update_disk() {
         switch (io_registers[diskcmd]) {
         case 1:
             /*from disk to memory*/
-            memcpy(&memory_array[buffer_addr], g_disk.data[sector], DISK_SECTOR_SIZE);
+            memcpy(&memory_array[buffer_addr], g_disk.data[sector], DISK_SECTOR_SIZE*4);
+    //        g_max_memory_index = MAX(g_max_memory_index, memory_array[buffer_addr] + DISK_SECTOR_SIZE*4);
             break;
         case 2:
             /* emory to disk */
-            memcpy(g_disk.data[sector], &memory_array[buffer_addr], DISK_SECTOR_SIZE);
+            memcpy(g_disk.data[sector], &memory_array[buffer_addr], DISK_SECTOR_SIZE*4);
             break;
         default:
             break;
@@ -551,7 +552,7 @@ static void load_memory(FILE* data_input_file) {
     while (fgets(line_buffer, DATA_LINE_LEN + 2, data_input_file) != NULL) {
         sscanf_s(line_buffer, "%X", &memory_array[line_count++]);
     }
-    g_max_memory_index = line_count - 1;
+//    g_max_memory_index = line_count - 1;
 }
 
 
@@ -630,6 +631,12 @@ static void execute_instructions(FILE* output_trace_file) {
 static void write_memory_file(char const* file_name) {
     /*write the memout file*/
     FILE* output_memory_file = file_validation(file_name, "w");
+    for (int i = DATA_MEMORY_SIZE; i > 0; i--) {
+        if (memory_array[i] != 0) {
+            g_max_memory_index = i;
+            break;
+        }
+    }
     for (int i = 0; i <= g_max_memory_index; i++) {
         fprintf(output_memory_file, "%05X\n", memory_array[i]);
     }
