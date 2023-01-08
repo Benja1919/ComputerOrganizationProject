@@ -614,7 +614,6 @@ static void execute_instructions(FILE* output_trace_file) {
             else {
                 g_pc -= 1;
             }
-            printf("%d\n", g_pc);
         }
         if (!is_jump_or_branch(curr_cmd->opcode)) {
             g_pc++;
