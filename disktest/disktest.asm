@@ -1,17 +1,16 @@
-MAIN:
+Main:
 	add $a0, $zero, $zero, 0					# set 1st sector adress
 	add $a1, $zero, $imm, 1						# set 2nd sector adress
 	jal $ra, $imm, $zero, Disk_test				# start disktest func
-	beq $imm, $zero, $zero, RETURN				#end program from Main section
+	beq $imm, $zero, $zero, Return				#end program from Main section
 	
 Disk_test:
-
 	add $s0, $zero, $imm, 1						# $s0 = const 1
 	add $t2, $zero, $imm, 1023
 	out $t2, $imm, $zero, 16					# ioregister[16 = diskbuffer] = $s0 = 0 -> start with first memory cell
 	
 	add $sp, $sp, $imm, -4						# set place for 1 items
-	sw $ra, $sp, $zero, 0						# save return adress in stack	
+	sw $ra, $sp, $zero, 0						# save Return adress in stack	
 	jal $ra, $imm, $zero, Wait	
 	out $a0, $imm, $zero, 15					# ioregister[15 = disksector] = $a0 -> select the first sector given
 	out $s0, $imm, $zero, 14					# ioregister[14 = diskcmd] = 1 -> read
@@ -38,18 +37,18 @@ Sec_loop:
 	
 	bgt $imm, $s1, $s2, Save_first				#compare two sums
 	sw $s2, $zero, $imm, 0x102
-	beq $imm, $zero, $zero, end_loop			#end program
+	beq $imm, $zero, $zero, End_loop			#end program
 
 Save_first:
 	sw $s1, $zero, $imm, 0x102
-	beq $imm, $zero, $zero, end_loop			#end program
+	beq $imm, $zero, $zero, End_loop			#end program
 
-end_loop:										# back to main
+End_loop:										# back to main
 	lw $ra, $sp, $zero, 0
 	add $sp, $sp, $imm, 4
 	beq $ra, $zero, $zero, 0					
 
-RETURN:
+Return:
 	halt $zero, $zero, $zero, 0					# End
 
 Wait:
