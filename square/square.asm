@@ -6,10 +6,9 @@ MAIN:
 	add $s2, $zero, $imm, 255				# $s2 = 255
 	add $t0, $zero, $s0, 0					# $t0 = index_1 = $s0
 	add $t1, $zero, $zero, 0	 			# $t1 = index_2 = 0
-	add $t2, $zero, $imm, 256				# $t2 = 256
-	mul $t2, $t2, $s1, 0					# $t2 = 256*size of rec
-	add $t2, $t2, $s0, 0					# $t2 = 256*size of rec + initial loc
-	add $t2, $t2, $s1, 0					# $t2 = 256*size of rec + initial loc + size of rec
+	mul $t2, $s2, $s1, 0					# $t2 = 255*size of rec
+	add $t2, $t2, $s0, 0					# $t2 = 255*size of rec + initial loc
+	add $t2, $t2, $s1, 0					# $t2 = 255*size of rec + initial loc + size of rec
 	add $s0, $zero, $imm, 1					# $s0 = 1
 LOOP:
 	bge $imm, $t0, $t2, END					# if index_1 >= $t2 jump to END
